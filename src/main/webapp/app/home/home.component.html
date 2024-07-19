@@ -8,6 +8,12 @@
 
     <p class="lead" jhiTranslate="home.subtitle">This is your homepage</p>
 
+    @if (account) {
+      <h2>ログインしています！！ ({{ account.login }})</h2>
+    } @else {
+      <h3>ログインしていません</h3>
+    }
+
     <div>
       @if (account !== null) {
         <div class="alert alert-success">

@@ -1,0 +1,8 @@
+{
+  "mfa": {},
+  "error": {
+    "mfa": {
+      "invalid.code": "Invalid Code"
+    }
+  }
+}

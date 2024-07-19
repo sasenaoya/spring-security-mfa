@@ -16,8 +16,12 @@ import org.springframework.security.config.annotation.web.configurers.HeadersCon
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.AuthenticationFailureHandler;
+import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.RememberMeServices;
+import org.springframework.security.web.authentication.SavedRequestAwareAuthenticationSuccessHandler;
+import org.springframework.security.web.authentication.SimpleUrlAuthenticationFailureHandler;
 import org.springframework.security.web.authentication.logout.HttpStatusReturningLogoutSuccessHandler;
 import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
@@ -53,6 +57,7 @@ public class SecurityConfiguration {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http, MvcRequestMatcher.Builder mvc) throws Exception {
+        var mfaAuthenticationHandler = new MfaAuthenticationHandler("/mfa");
         http
             .cors(withDefaults())
             .csrf(csrf ->
@@ -89,6 +94,7 @@ public class SecurityConfiguration {
                     .requestMatchers(mvc.pattern("/api/account/reset-password/init")).permitAll()
                     .requestMatchers(mvc.pattern("/api/account/reset-password/finish")).permitAll()
                     .requestMatchers(mvc.pattern("/api/admin/**")).hasAuthority(AuthoritiesConstants.ADMIN)
+                    .requestMatchers(mvc.pattern("/api/mfa")).permitAll()
                     .requestMatchers(mvc.pattern("/api/**")).authenticated()
                     .requestMatchers(mvc.pattern("/v3/api-docs/**")).hasAuthority(AuthoritiesConstants.ADMIN)
                     .requestMatchers(mvc.pattern("/management/health")).permitAll()
@@ -113,10 +119,13 @@ public class SecurityConfiguration {
                 formLogin
                     .loginPage("/")
                     .loginProcessingUrl("/api/authentication")
-                    .successHandler((request, response, authentication) -> response.setStatus(HttpStatus.OK.value()))
-                    .failureHandler((request, response, exception) -> response.setStatus(HttpStatus.UNAUTHORIZED.value()))
+                    .successHandler(mfaAuthenticationHandler)
+                    .failureHandler(mfaAuthenticationHandler)
                     .permitAll()
             )
+            .exceptionHandling(exceptions -> {
+                exceptions.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED));
+            })
             .logout(logout ->
                 logout.logoutUrl("/api/logout").logoutSuccessHandler(new HttpStatusReturningLogoutSuccessHandler()).permitAll()
             );
@@ -131,5 +140,15 @@ public class SecurityConfiguration {
     @Bean
     MvcRequestMatcher.Builder mvc(HandlerMappingIntrospector introspector) {
         return new MvcRequestMatcher.Builder(introspector);
+    }
+
+    @Bean
+    AuthenticationSuccessHandler successHandler() {
+        return new SavedRequestAwareAuthenticationSuccessHandler();
+    }
+
+    @Bean
+    AuthenticationFailureHandler failureHandler() {
+        return new SimpleUrlAuthenticationFailureHandler("/login?error");
     }
 }
